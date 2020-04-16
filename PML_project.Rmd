@@ -1,0 +1,117 @@
+---
+title: "Practical Machine Learning Project"
+author: "Andrey Ivanov"
+date: "16 04 2020"
+output: html_document
+---
+  
+## Synopsis  
+The goal of the study is to predict the manner in which people do excercises using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.  
+The main data set stored in pml-training.csv file, it's labeled with "classe" variable.  
+There is data set pml-testing.csv with 20 observations which should be predicted using prediction model.  
+
+## 1. Exploratory data analysis.  
+Let's load the data and look at it:  
+
+```{r, echo=TRUE}
+pml.training <- read.csv("pml-training.csv")
+pml.testing <- read.csv("pml-testing.csv")
+```
+
+- First of all pml.training data set should be split on training and testing data using createDataPartition() function (set.seed() function used for reproducibility purpose):  
+
+```{r, echo=TRUE}
+library(caret)
+set.seed(2435)
+inTrain <- createDataPartition(y=pml.training$classe, p=.75, list=FALSE)
+training <- pml.training[inTrain,]
+testing <- pml.training[-inTrain,]
+```
+
+```{r, echo=TRUE}
+dim(pml.training)
+str(pml.training[,c(0:20,160)])
+```
+
+- There are 19622 observations with 160 variables. Lets try to redice dimentions of future model.  
+- First: there are first seven variables, that doesn't relate to outcome. "classe" relates only to the signals from accelerometers. Let's rid off them.  
+- Second: there are a lot of variables with NA or emty values across all the observations. Let's indicate and erase them as well.  
+
+```{r, echo=TRUE}
+training <- training[, -c(1:7)]
+testing <- testing[, -c(1:7)]
+pml.testing <- pml.testing[, -c(1:7)]
+
+NAcols <- which(colSums(is.na(training) | training == "")/dim(training)[1] > 0.95)
+training <- training[, -NAcols]
+testing  <- testing[, -NAcols]
+pml.testing  <- pml.testing[, -NAcols]
+dim(pml.training)
+
+```
+
+Now there are 53 covariates including only signals from accelerometers. It's not clear which ones are better, so all of them will be included to the prediction model building.  
+
+## 2. Building a model.  
+- caret package will be used through all the process.  
+
+- This prdiction task is classification between 5 classes. Let's use Random Forest model.  
+- Cross validation with 5 subsamples will be used to reduce out-of-sample errors.  
+
+```{r, echo=TRUE}
+control_rf <- trainControl(method="cv", number=5, verboseIter=FALSE)
+```
+
+- Fit the model random forest model (method="rf") with "classe" as outcome and all the remaining parameters as predictors. trControl defines cross validation process in the model.  
+```{r, echo=TRUE}
+set.seed(1518)
+model_rf <- train(classe ~ ., data = training, method = "rf", trControl = control_rf)
+```
+
+
+- Let's look at the model.  
+```{r, echo=TRUE}
+print(model_rf)
+plot(model_rf$finalModel)
+```
+
+- Maximum Model's accuracy is 99.2% with number of variables in each split mrty = 2   
+and number of trees: 500  
+- Let's check out-of-sample error using testing data set:  
+
+```{r, echo=TRUE}
+pred_rf <- predict(model_rf, newdata=testing)
+confusionMatrix(pred_rf, testing$classe)
+```
+
+- Predictions' accuracy is 99.18% . So Random Forest model is good for this job.  
+- Expected out of sample error is 0.82%  
+
+
+## 3. Making Predictions. 
+- Let's predict classes of 20 data samples from pml.testing:  
+```{r, echo=TRUE}
+fin_preds <- predict(model_rf, newdata=pml.testing)
+fin_preds
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
